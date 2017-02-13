@@ -4,7 +4,7 @@ using System;
 
 
 public class BreakScrollView : MonoBehaviour {
-
+    //跟UIWrapContent一样的用来设置Item的一个回调
     public delegate void OnInitializeItem(GameObject obj, int wrapIndex, int scrollIndex, int realIndex);
 
     public int itemSize = 100;
@@ -13,16 +13,19 @@ public class BreakScrollView : MonoBehaviour {
 
     public int maxIndex=0;
 
-    public bool cullContent=true;
+    public bool cullContent=true;//是否隐藏超出边界的Item的标记
 
-    public bool mHorizontal = false;
+    public bool mHorizontal = false;//滑动方向
 
-    public OnInitializeItem onInitializeItem;
+    public OnInitializeItem onInitializeItem;//设置Item的回调
 
-    protected List<UIScrollView> mScrolls;
-    protected List<UIPanel> mPanels;
-    protected List<BreakWrapContent> mWraps;
+    protected List<UIScrollView> mScrolls;//众多的ScrollView
+    protected List<UIPanel> mPanels;//众多的Panel
+    protected List<BreakWrapContent> mWraps;//众多的WrapContent
+
+    //到当前ScrollView为止所需要的偏移补偿 也就是ScrollView的坐标需要偏移多少才能对接上一个ScrollView
     protected List<float> mOffsets;
+
     //到当前ScrollView为止，每个ScrollView能完整放下的Item的个数之和
     protected List<int> mCapacity;
     //到当前ScrollView为止，ScrollView Size的总长度
@@ -31,10 +34,10 @@ public class BreakScrollView : MonoBehaviour {
 
     protected virtual void Awake()
     {
-        OnValidate();
-        CacheAndInitScrollView();
-        ResetScrollPosition();
-        mPanels[0].onClipMove += OnHeadMove;
+        OnValidate();//用来限制minIndex和maxIndex，完全是从WrapContent抄来的
+        CacheAndInitScrollView();//缓存各ScrollView
+        ResetScrollPosition();//各ScrollView的复位 初始化它们的偏移量，设置好初始坐标
+        mPanels[0].onClipMove += OnHeadMove;//由第一个ScrollView的滑动 带动所有ScrollView的滑动，才能动的一致
     }
 
     void CacheAndInitScrollView()
@@ -60,7 +63,6 @@ public class BreakScrollView : MonoBehaviour {
            
             var scroll = child.GetComponent<UIScrollView>();
             var panel = child.GetComponent<UIPanel>();
-            
             var wrap = scroll.GetComponentInChildren<BreakWrapContent>();
             if (wrap == null)
                 wrap = scroll.transform.GetChild(0).gameObject.AddComponent<BreakWrapContent>();
@@ -71,8 +73,9 @@ public class BreakScrollView : MonoBehaviour {
             {
                 scroll.movement = UIScrollView.Movement.Horizontal ;
                 
+                //累计到当前SV为止能完整放下的Item个数之和 包括当前的
                 num += (int)(panel.GetViewSize().x / (float)itemSize);
-                length = panel.GetViewSize().x;
+                length = panel.GetViewSize().x;//当前SV的size
             }
             else
             {
@@ -85,7 +88,7 @@ public class BreakScrollView : MonoBehaviour {
             mPanels.Add(panel);
             mWraps.Add(wrap);
             mCapacity.Add(num);
-            mScrollLengths.Add((i > 0 ? mScrollLengths[i - 1] : 0) + length);
+            mScrollLengths.Add((i > 0 ? mScrollLengths[i - 1] : 0) + length);//累计到当前SV的长度之和 包括当前
         }
     }
 
@@ -163,7 +166,11 @@ public class BreakScrollView : MonoBehaviour {
 
         int capacity =scrollIndex>0? mCapacity[scrollIndex - 1]:0;
         if (mHorizontal)
-        {
+        {   //这步是关键 只要加回到上一个SV为止能够完整放下的Item数就可以了。因为不完整的那个是和下一个SV共享的
+            //所以其实应该算成是下一个SV能完整放下的个数里 而下一个SV不能完整放下的那个又应该算到下下个SV，
+            //所以只需要加回能完整放下的个数就行了。得到的就是realIndex
+            //而localPos/itemSize得到的则是 假设当前SV是独立的情况下得到的realIndex，然而这个SV并不是独立的，
+            //它的第一个realIndex应该是上一个SV末尾不完整的那个Item的realIndex
             return Mathf.RoundToInt(localposition.x / itemSize) + capacity;
         }else
         {
@@ -179,10 +186,18 @@ public class BreakScrollView : MonoBehaviour {
             maxIndex = minIndex;
     }
 
-
+    /// <summary>
+    /// 检查realIndex是否超出了所在SV的min和max 
+    /// 比如第0个Item应该是在第一个SV，最后一个Item在最后一个SV 中间的也都一样 有min和max
+    /// </summary>
+    /// <param name="scrollIndex"></param>
+    /// <param name="realIndex"></param>
+    /// <returns></returns>
     public bool CheckIndexRange(int scrollIndex,int realIndex)
     {
+        //maxIndex应该是
         int curMaxIndex = maxIndex - Mathf.FloorToInt((mScrollLengths[mScrollLengths.Count - 1] - mScrollLengths[scrollIndex])/itemSize);
+        //minIndex很显然的就是当前SV的起始Item的realIndex了。
         int curMinIndex = minIndex + (scrollIndex>0?mCapacity[scrollIndex-1]:0);
         return realIndex >= curMinIndex && realIndex < curMaxIndex;
     }
