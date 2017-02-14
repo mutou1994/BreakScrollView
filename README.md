@@ -1,0 +1,2 @@
+# BreakScrollView
+NGUI:由多个ScrollView拼接的一个可截断的ScrollView
