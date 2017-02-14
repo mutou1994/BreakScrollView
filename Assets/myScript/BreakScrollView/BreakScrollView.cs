@@ -195,11 +195,15 @@ public class BreakScrollView : MonoBehaviour {
     /// <returns></returns>
     public bool CheckIndexRange(int scrollIndex,int realIndex)
     {
-        //maxIndex应该是
+        //maxIndex应该是由maxIndex减去当前SV之后所能放下的Item个数
         int curMaxIndex = maxIndex - Mathf.FloorToInt((mScrollLengths[mScrollLengths.Count - 1] - mScrollLengths[scrollIndex])/itemSize);
         //minIndex很显然的就是当前SV的起始Item的realIndex了。
         int curMinIndex = minIndex + (scrollIndex>0?mCapacity[scrollIndex-1]:0);
         return realIndex >= curMinIndex && realIndex < curMaxIndex;
+
+        //这里用来限制SV滑动的curMax和Min其实是有问题的，因为SV有个滑动的弹性，滑倒Max之后还能继续滑动一段距离，
+        //但是由于已经到达MaxIndex，后续的Item会被判定为超出限界而被隐藏，导致下个SV的首个Item不能到达当前SV的情况。
+        //但是暂时没有想到更好的办法，先用这个办法用着吧。
     }
 
 
@@ -207,18 +211,24 @@ public class BreakScrollView : MonoBehaviour {
     {
         int realIndex = GetRealIndex(obj.transform.localPosition, scrollIndex);
        
-        if (minIndex!=maxIndex&&!CheckIndexRange(scrollIndex,realIndex))
+        if (minIndex!=maxIndex&&!CheckIndexRange(scrollIndex,realIndex))//判断超出限界则设置active为false
         {
             NGUITools.SetActive(obj, false);
             return;
         }else 
         {
+            //测试用，可删除
             obj.GetComponent<UILabel>().text = realIndex.ToString();
+
             if (onInitializeItem!=null)
             onInitializeItem(obj, index, scrollIndex, realIndex);
         }
     }
 
+    /// <summary>
+    /// 带头的SV滑动时带动其他SV滑动
+    /// </summary>
+    /// <param name="panel"></param>
     void OnHeadMove(UIPanel panel)
     {
         Vector3 pos0 = panel.transform.localPosition;
@@ -226,7 +236,7 @@ public class BreakScrollView : MonoBehaviour {
         {
             Vector3 pos = mScrolls[i].transform.localPosition;
             Vector2 clipOffset = mPanels[i].clipOffset;
-            if (mHorizontal)
+            if (mHorizontal)//根据缓存好的mOffset设置其他SV的坐标
             {
                 pos.x = pos0.x - mOffsets[i];
                 mScrolls[i].transform.localPosition = pos;

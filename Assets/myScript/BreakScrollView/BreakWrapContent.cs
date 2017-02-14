@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 public class BreakWrapContent : MonoBehaviour {
 
+    //这个脚本基本上就只是一个UIWrapContent，只是本来在UIWrapContent用到的一些数据需要从BreakScrollView获取
+
     BreakScrollView breakScroll;
     BreakScrollView BreakScroll
     {
@@ -32,7 +34,7 @@ public class BreakWrapContent : MonoBehaviour {
     {
         CacheScrollView();
         CacheChilds();
-        AdjustGridPos();
+        adjustWrapPos();
         ResetChildPostion();
         mPanel.onClipMove += OnMove;
         WrapContent();
@@ -57,22 +59,29 @@ public class BreakWrapContent : MonoBehaviour {
         }
     }
 
-   
-    void AdjustGridPos()
+    /// <summary>
+    /// 调整Wrap的起始坐标，使得ScrollView的复位坐标为0 详情见 http://blog.csdn.net/mutou_222/article/details/54975521 
+    /// </summary>
+    public void adjustWrapPos()
     {
-        Vector3 pos = transform.localPosition;
+        if (mScroll == null)
+            CacheScrollView();
+        if (mChilds == null)
+            CacheChilds();
+
+        Bounds b = NGUIMath.CalculateRelativeWidgetBounds(mScroll.transform, mChilds[0], true);
+        Vector2 pos = transform.localPosition;
         if (mHorizontal)
         {
-            pos.x = -(mPanel.GetViewSize().x / 2f - mPanel.finalClipRegion.x - itemSize / 2f);
-            pos.y = mPanel.finalClipRegion.y;
+            pos.x = -(mPanel.GetViewSize().x / 2f - mPanel.baseClipRegion.x - b.extents.x - mPanel.clipSoftness.x);
         }
         else
         {
-            pos.x = mPanel.finalClipRegion.x;
-            pos.y = mPanel.GetViewSize().y / 2f + mPanel.finalClipRegion.y - itemSize / 2f;
+            pos.y = mPanel.GetViewSize().y / 2f + mPanel.baseClipRegion.y - b.extents.y - mPanel.clipSoftness.y;
         }
         transform.localPosition = pos;
     }
+
 
     [ContextMenu("ResetChildPosition")]    
     public virtual void ResetChildPostion()
@@ -107,6 +116,7 @@ public class BreakWrapContent : MonoBehaviour {
         WrapContent();
     }
 
+    //基本上是原原本本的WrapContent了，修改了一些界限判定
     void WrapContent()
     {
         float extents = itemSize * mChilds.Count * 0.5f;
